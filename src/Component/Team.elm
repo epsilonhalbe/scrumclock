@@ -24,12 +24,15 @@ import String.Utils exposing (initials)
 
 
 
+
 type alias Team = Set String
 
 type alias Model = { name        : String
                    , currentTeam : Set String
                    , savedTeams  : List Team
                    , mdl         : Material.Model }
+
+type alias HasTeam m = {m | team : Model}
 
 init : Model
 init = { name = ""
@@ -50,8 +53,13 @@ type Msg = Add String
          | Name String
          | Mdl (Material.Msg Msg)
 
-update : Msg -> Model -> (Model, Cmd Msg)
-update action model =
+update : (Msg -> msg) -> Msg -> HasTeam m -> (HasTeam m, Cmd msg)
+update lift msg model =
+  let (team, cmd) = update_ msg model.team
+  in ({model | team = team}, Cmd.map lift cmd)
+
+update_ : Msg -> Model -> (Model, Cmd Msg)
+update_ action model =
   case action of
     Add members ->
            let newMembers = Set.fromList <| List.filter (not << String.isEmpty)

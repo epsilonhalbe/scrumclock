@@ -62,21 +62,19 @@ init = { clock = Clock.init
 
 type Msg = Team Team.Msg
          | Clock Clock.Msg
-         | KeyUp Int
          | Mdl (Material.Msg Msg)
+         | KeyUp Int
          | None
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
   case action of
-    Team act  -> let (team_, msg_) = Team.update act model.team
-                  in ({ model | team = team_}, Cmd.map Team msg_ )
-    Clock act -> let (clock_, msg_) = Clock.update act model.clock
-                  in ({ model | clock = clock_}, Cmd.map Clock msg_ )
+    Team  act -> Team.update  Team  act model
+    Clock act -> Clock.update Clock act model
+    Mdl   act -> Material.update Mdl act model
     KeyUp keycode -> if keycode == 13 {- ENTER -}
                        then update (Team <| Add model.team.name) model
                        else update None model
-    Mdl msg -> Material.update Mdl msg model
     None -> (model, Cmd.none)
 
 -- VIEW

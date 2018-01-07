@@ -30,6 +30,8 @@ type alias Model = { sec         : Int
                    , mdl         : Material.Model
                    }
 
+type alias HasClock m = {m | clock : Model}
+
 init : Model
 init = { sec = 0
        , maxMinutes = 15
@@ -45,8 +47,13 @@ type Msg = SetMinutes Float
 
 -- UPDATE
 
-update : Msg -> Model -> (Model, Cmd Msg)
-update action model =
+update : (Msg -> msg) -> Msg -> HasClock m -> (HasClock m, Cmd msg)
+update lift msg model =
+  let (clock, cmd) = update_ msg model.clock
+  in ({model | clock = clock}, Cmd.map lift cmd)
+
+update_ : Msg -> Model -> (Model, Cmd Msg)
+update_ action model =
   case action of
     SetMinutes maxMinutes -> ({model | maxMinutes = maxMinutes }, Cmd.none)
     Start -> ({model | running = True }, Cmd.none)
