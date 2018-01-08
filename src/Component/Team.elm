@@ -1,29 +1,26 @@
-port module Component.Team exposing (..)
+port module Component.Team exposing ( Model, Msg(..), init, update, view
+                                    , initialize)
 
 import Set exposing (Set, size, insert, empty)
 import String
 
 import Material
-import Material.Button    as Button exposing (..)
+import Material.Button    as Button
 import Material.Card      as Card
-import Material.Chip      as Chip exposing (..)
+import Material.Chip      as Chip
 import Material.Color     as Color
 import Material.Elevation as Elevation
 import Material.Grid      as Grid
 import Material.Icon      as Icon
 import Material.List      as MList
-import Material.Options   as Options exposing (Style, css)
-import Material.Slider    as Slider
-import Material.Snackbar  as Snackbar
+import Material.Options   as Options exposing (css)
 import Material.Textfield as Textfield
-import Material.Helpers exposing (map1st, map2nd)
 
-import Html exposing (Html, span, div, programWithFlags)
+import Html exposing (Html, span, div)
+import Svg.Attributes exposing (style)
+import Json.Decode as Decode
 
 import String.Utils exposing (initials)
-
-
-
 
 type alias Team = Set String
 
@@ -51,6 +48,8 @@ type Msg = Add String
          | SaveTeam
          | SetTeam (Set String)
          | Name String
+         | KeyUp Int
+         | None
          | Mdl (Material.Msg Msg)
 
 update : (Msg -> msg) -> Msg -> HasTeam m -> (HasTeam m, Cmd msg)
@@ -80,6 +79,10 @@ update_ action model =
     SetTeam xs -> ( {model | currentTeam = xs       }, Cmd.none)
     Clear      -> ( {model | currentTeam = Set.empty}, Cmd.none)
     Name name  -> ( {model | name        = name     }, Cmd.none)
+    KeyUp keycode -> if keycode == 13 {- ENTER -}
+                       then update_ (Add model.name) model
+                       else update_ None model
+    None -> (model, Cmd.none)
     Mdl msg -> Material.update Mdl msg model
 
 
@@ -94,7 +97,7 @@ memberChip running str =
     [ Chip.contact Html.span
         [ Color.background Color.primary
         , Color.text Color.white
---      , Options.onClick None
+        , Options.onClick None
         ]
         [ Html.text <| initials str ]
     , Chip.content []
@@ -129,6 +132,51 @@ teamCard model xs =
       ]
    ]
 
+view : Bool -> Model -> Html Msg
+view isRunning model = Html.div []
+            [ Html.p [] [Html.text "Start by adding new members to your scrum team by entering some names (separated by semicolons)."]
+            , Button.render Mdl [0] model.mdl
+                ([ Button.fab
+                 , Button.colored
+                 , Options.onClick (Add model.name)
+                 ] ++ if isRunning || String.isEmpty model.name
+                                   || Set.member model.name model.currentTeam
+                        then [Button.disabled]
+                        else []
+                )
+                [ Icon.i "add"]
+            , Html.span [style "margin-left: 1em"]
+                 [Textfield.render Mdl [2] model.mdl
+                ([ Textfield.label "new member"
+                 , Textfield.floatingLabel
+                 , Textfield.value model.name
+                 , Options.onInput Name
+                 , Options.on "keyup" (Decode.map KeyUp <| Decode.at ["keyCode"] Decode.int)
+                 ] ++ if isRunning then [Textfield.disabled] else [])
+                []]
+            , div [style "text-align:left;"] <| List.map (memberChip isRunning) <| Set.toList model.currentTeam
+            , div [style "padding-top: 1em"]
+               [ Button.render Mdl [0] model.mdl
+                  ([ Button.raised
+                   , Button.colored
+                   , Options.onClick Clear
+                   ] ++ if isRunning || Set.isEmpty model.currentTeam
+                          then [Button.disabled] else [])
+                  [ Html.text "Clear" ]
+               ]
+            , div [style "padding-top: 1em"]
+               [ Button.render Mdl [0] model.mdl
+                  ([ Button.raised
+                   , Button.colored
+                   , Options.onClick SaveTeam
+                   ] ++ if isRunning || Set.isEmpty model.currentTeam
+                                     || List.member model.currentTeam model.savedTeams
+                          then [Button.disabled] else [])
+                  [ Html.text "Save new Team" ]
+               ]
+            , div [style "padding-top: 1em"]
+               [ Grid.grid [] <| List.map (teamCard model) model.savedTeams ]
+            ]
 
 -- PORTS
 

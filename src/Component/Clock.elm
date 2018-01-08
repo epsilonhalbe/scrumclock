@@ -1,28 +1,25 @@
-module Component.Clock exposing (..)
+module Component.Clock exposing ( Model, Msg(..), update, subscriptions
+                                , init, clock, slider, timeFormat)
 
 import Material
-import Material.Button as Button exposing (..)
-import Material.Card as Card
-import Material.Chip as Chip exposing (..)
-import Material.Color as Color
-import Material.Elevation as Elevation
-import Material.Grid as Grid
-import Material.Helpers exposing (map1st, map2nd)
-import Material.Icon as Icon
-import Material.List as MList
-import Material.Options as Options exposing (Style, css)
-import Material.Slider as Slider
-import Material.Snackbar as Snackbar
-import Material.Textfield as Textfield
+import Material.Button  as Button
+import Material.Icon    as Icon
+import Material.Options as Options
+import Material.Slider  as Slider
 
 import Time exposing (Time, every, second, inSeconds)
-import String.Utils exposing (initials)
+import Set exposing (Set, size, insert, empty)
 import String exposing (join)
 import List exposing (map)
-import Html exposing (Html, span, div, programWithFlags)
+import Html exposing (Html, span, div)
 import Svg exposing (svg, text, circle, line, path)
 import Svg.Attributes exposing ( style, writingMode, textAnchor, fill, x, y
-                               , fillOpacity, strokeWidth, stroke, d )
+                               , fillOpacity, strokeWidth, stroke, d, width 
+                               , viewBox, height)
+
+import String.Utils exposing (initials)
+
+import Component.Team as Team
 
 type alias Model = { sec         : Int
                    , maxMinutes  : Float
@@ -61,10 +58,47 @@ update_ action model =
     Tick sec -> ({model | sec = sec}, Cmd.none)
     Mdl msg -> Material.update Mdl msg model
 
+slider : Team.Model -> Model -> Html Msg
+slider team model =
+    Html.div []
+             [ Button.render Mdl [0] model.mdl
+                 ([ Button.fab
+                  , Button.colored
+                  , Options.onClick <| if model.running then Stop else Start
+                  ] ++ if Set.isEmpty team.currentTeam
+                          then [Button.disabled]
+                          else []
+                  )
+                 [ Icon.i <| if model.running then "stop" else "play_arrow"]
+             , Slider.view <|
+                 [ Slider.onChange SetMinutes
+                 , Slider.value <| model.maxMinutes
+                 , Slider.max 30
+                 , Slider.min 1
+                 , Slider.step 1
+                 ] ++ if model.running then [Slider.disabled] else []
+             , Html.p [] [Html.text <| timeFormat (round (model.maxMinutes * 60) - model.sec)]
+             ]
 
-clock : Float -> Int -> Int -> String ->  List (Svg.Svg msg)
-clock sec_ n k str =
-    let maxR = 250
+clock : Team.Model -> Model -> Html Msg
+clock team model =
+      Html.span []
+        [ svg [ style "border:1px white solid"
+              , if Set.isEmpty team.currentTeam
+                   then height "0"
+                   else viewBox "-260 -260 520 520"
+              , width "100%"
+              ]
+              (List.concat (List.map2 (clock_ team model)
+                                      (List.range 1 (Set.size team.currentTeam))
+                                      (Set.toList team.currentTeam)))
+        ]
+
+clock_ : Team.Model -> Model -> Int -> String -> List (Svg.Svg msg)
+clock_ team model k str =
+    let sec_ = (toFloat (model.sec * (Set.size team.currentTeam))) / (60 * model.maxMinutes)
+        n    = Set.size team.currentTeam
+        maxR = 250
         minR = 50
         area = (maxR^2 - minR^2) * pi
         n_ = toFloat (n+1)
@@ -102,6 +136,10 @@ arc inneR outeR fromDeg toDeg =
                     ,["L", startOuter, "Z"]
                     ]
 
+timeFormat : Int -> String
+timeFormat secs = let mins_ = String.padLeft 2 '0' <| toString <| secs // 60
+                      secs_ = String.padLeft 2 '0' <| toString <| secs % 60
+                   in mins_ ++ ":" ++ secs_
 
 -- SUBSCRIPTIONS
 
